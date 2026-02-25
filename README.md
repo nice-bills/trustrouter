@@ -139,7 +139,7 @@ export BASE_RPC_URL="https://mainnet.base.org"
 ## Development
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/trustrouter
+git clone https://github.com/nice-bills/trustrouter
 cd trustrouter
 npm install
 npm run build
