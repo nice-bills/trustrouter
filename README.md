@@ -1,5 +1,7 @@
 # TrustRouter
 
+[![npm version](https://badge.fury.io/js/trustrouter.svg)](https://badge.fury.io/js/trustrouter)
+
 **ERC-8004 Reputation-Aware Service Router**
 
 Discover, rank, and route to the best services on-chain — agents, MCP tools, oracles, APIs, DeFi bots, and anything registered on [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004). TrustRouter queries the Identity and Reputation registries using free public RPCs to find the highest-trust provider for any given task.
