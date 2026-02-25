@@ -95,6 +95,9 @@ const FREE_RPCS: Record<string, string[]> = {
 const IDENTITY_ABI = [
     "function tokenURI(uint256 tokenId) view returns (string)",
     "function ownerOf(uint256 tokenId) view returns (address)",
+    "function getMetadata(uint256 agentId, string memory metadataKey) external view returns (bytes memory)",
+    "event Registered(uint256 indexed agentId, string agentURI, address indexed owner)",
+    "event URIUpdated(uint256 indexed agentId, string newURI, address indexed updatedBy)"
 ];
 
 const REPUTATION_ABI = [
@@ -165,6 +168,33 @@ function getContractAddresses(chain: string) {
         return { identity: TESTNET_IDENTITY, reputation: TESTNET_REPUTATION, validation: TESTNET_VALIDATION };
     }
     return { identity: IDENTITY_REGISTRY, reputation: REPUTATION_REGISTRY, validation: VALIDATION_REGISTRY };
+}
+
+/** 
+ * robustly fetch agent URI. The deployed ERC-8004 identity registry currently
+ * reverts on tokenURI. We fallback to reading getMetadata("agentURI") or "tokenURI".
+ */
+async function getAgentURI(identity: ethers.Contract, agentId: number): Promise<string | null> {
+    try {
+        const uri = await identity.tokenURI(agentId);
+        if (uri) return uri;
+    } catch { /* ignore revert */ }
+
+    // Fallback: the contract stores arbitrary K/V metadata.
+    // We try to read "agentURI" and "tokenURI" directly from the mapping.
+    try {
+        const keysToTry = ["agentURI", "tokenURI", "uri", "metadata", "url"];
+        for (const key of keysToTry) {
+            try {
+                const bytes = await identity.getMetadata(agentId, key);
+                if (bytes && bytes !== "0x") {
+                    return ethers.toUtf8String(bytes);
+                }
+            } catch { /* maybe key not set or getMetadata reverts */ }
+        }
+    } catch { /* getting metadata failed entirely */ }
+
+    return null;
 }
 
 /** Get all supported chain names */
@@ -352,7 +382,7 @@ export async function fetchAgents(options: {
                 // Fetch owner + registration file
                 const [owner, tokenURI] = await Promise.all([
                     identity.ownerOf(agentId).catch(() => "unknown"),
-                    identity.tokenURI(agentId).catch(() => null),
+                    getAgentURI(identity, agentId),
                 ]);
 
                 const registration = await resolveRegistrationFile(tokenURI);
@@ -432,7 +462,7 @@ export async function fetchAgentById(
     try {
         const [owner, tokenURI] = await Promise.all([
             identity.ownerOf(agentId).catch(() => "unknown"),
-            identity.tokenURI(agentId).catch(() => null),
+            getAgentURI(identity, agentId),
         ]);
 
         const registration = await resolveRegistrationFile(tokenURI);
