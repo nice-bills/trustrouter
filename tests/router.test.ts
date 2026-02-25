@@ -9,6 +9,8 @@ function makeAgent(overrides: Partial<AgentData> = {}): AgentData {
         registration: {},
         feedbackCount: 0,
         avgScore: 0,
+        validationCount: 0,
+        validationAvg: 0,
         ...overrides,
     };
 }

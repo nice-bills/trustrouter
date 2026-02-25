@@ -1,6 +1,6 @@
 {
   "name": "trustrouter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ERC-8004 reputation-aware service router — discover, rank, and route to the best services and agents on-chain",
   "type": "module",
   "main": "dist/registry.js",
@@ -34,7 +34,7 @@
     "cli",
     "blockchain"
   ],
-  "author": "",
+  "author": "Antigravity",
   "license": "MIT",
   "engines": {
     "node": ">=18"
