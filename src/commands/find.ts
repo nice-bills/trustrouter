@@ -67,8 +67,11 @@ function toJson(s: ScoredAgent) {
         trustScore: s.trustScore,
         feedbackCount: s.agent.feedbackCount,
         avgScore: s.agent.avgScore,
+        validationCount: s.agent.validationCount,
+        validationAvg: s.agent.validationAvg,
         services: s.agent.registration.services || [],
         x402Support: s.agent.registration.x402Support || false,
+        x402Endpoint: s.agent.registration.services?.find(svc => svc.name.toLowerCase() === "x402")?.endpoint || null,
         owner: s.agent.owner,
     };
 }

@@ -131,6 +131,7 @@ export async function inspectCommand(idOrName: string, options: InspectOptions):
             [chalk.bold("Trust Score"), scoreColor(`${trustScore.toFixed(1)}/100`) + "  " + scoreBar(trustScore)],
             [chalk.bold("Feedback"), `${agent.feedbackCount} review${agent.feedbackCount !== 1 ? "s" : ""}`],
             [chalk.bold("Avg Score"), agent.avgScore > 0 ? `${agent.avgScore.toFixed(2)}/100` : chalk.dim("n/a")],
+            [chalk.bold("Validation"), agent.validationCount > 0 ? `${agent.validationCount} proof(s), avg ${agent.validationAvg}%` : chalk.dim("No proofs")],
             [chalk.bold("x402 Pay"), agent.registration.x402Support ? chalk.green.bold("✓ Supported") : chalk.dim("✗ Not supported")],
         );
         console.log(trustTable.toString());

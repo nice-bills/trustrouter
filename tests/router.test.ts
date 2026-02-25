@@ -25,7 +25,7 @@ describe("computeTrustScore", () => {
         expect(score).toBeLessThanOrEqual(100);
     });
 
-    it("weights reputation at 60% and activity at 40%", () => {
+    it("weights reputation at 50%, validation at 30%, and activity at 20%", () => {
         // An agent with perfect reputation but 1 review should score
         // less than one with perfect reputation and 100 reviews
         const fewReviews = computeTrustScore(makeAgent({ feedbackCount: 1, avgScore: 100 }));

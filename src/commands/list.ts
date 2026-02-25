@@ -44,8 +44,12 @@ export async function listCommand(options: ListOptions): Promise<void> {
                     name: r.agent.registration.name,
                     trustScore: r.trustScore,
                     feedbackCount: r.agent.feedbackCount,
+                    avgScore: r.agent.avgScore,
+                    validationCount: r.agent.validationCount,
+                    validationAvg: r.agent.validationAvg,
                     services: r.agent.registration.services || [],
                     x402Support: r.agent.registration.x402Support || false,
+                    x402Endpoint: r.agent.registration.services?.find(svc => svc.name.toLowerCase() === "x402")?.endpoint || null,
                 })),
                 null, 2
             ));

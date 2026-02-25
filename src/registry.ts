@@ -11,6 +11,10 @@ import { loadCache, saveCache, getCachedChain } from "./cache.js";
 // Same CREATE2 address across all mainnets
 const IDENTITY_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432";
 const REPUTATION_REGISTRY = "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63";
+// Validation Registry — deployed via CREATE2 (same pattern as above)
+// NOTE: Not yet deployed by the ERC-8004 team (spec under active discussion).
+// Once deployed, update this address. Queries fail gracefully (return 0).
+const VALIDATION_REGISTRY = "0x8004000000000000000000000000000000000000"; // placeholder
 
 // Free public RPCs — no API key needed
 // ERC-8004 contracts are deployed via CREATE2 (same address on all chains)
@@ -98,12 +102,19 @@ const REPUTATION_ABI = [
     "function getSummary(uint256 agentId, address[] clientAddresses, string tag1, string tag2) view returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals)",
 ];
 
+const VALIDATION_ABI = [
+    "function getAgentValidations(uint256 agentId) view returns (bytes32[])",
+    "function getSummary(uint256 agentId, address[] validatorAddresses, string tag) view returns (uint64 count, uint8 avgResponse)",
+];
+
 // ── Types ──────────────────────────────────────────────────────────
 
 export interface ServiceEntry {
     name: string;
     endpoint: string;
     version?: string;
+    skills?: string[];
+    domains?: string[];
 }
 
 export interface RegistrationFile {
@@ -123,6 +134,8 @@ export interface AgentData {
     registration: RegistrationFile;
     feedbackCount: number;
     avgScore: number;
+    validationCount: number;
+    validationAvg: number;
 }
 
 // Chain IDs for staticNetwork (skips ethers auto-detect retry loop)
@@ -143,14 +156,15 @@ const CHAIN_IDS: Record<string, number> = {
 // Testnet contract addresses (different from mainnet)
 const TESTNET_IDENTITY = "0x8004A818BFB912233c491871b3d84c89A494BD9e";
 const TESTNET_REPUTATION = "0x8004B663056A597Dffe9eCcC1965A193B7388713";
+const TESTNET_VALIDATION = "0x8004000000000000000000000000000000000000"; // placeholder
 const TESTNET_CHAINS = new Set(["sepolia", "base-sepolia"]);
 
 /** Get the correct contract addresses for a chain */
 function getContractAddresses(chain: string) {
     if (TESTNET_CHAINS.has(chain)) {
-        return { identity: TESTNET_IDENTITY, reputation: TESTNET_REPUTATION };
+        return { identity: TESTNET_IDENTITY, reputation: TESTNET_REPUTATION, validation: TESTNET_VALIDATION };
     }
-    return { identity: IDENTITY_REGISTRY, reputation: REPUTATION_REGISTRY };
+    return { identity: IDENTITY_REGISTRY, reputation: REPUTATION_REGISTRY, validation: VALIDATION_REGISTRY };
 }
 
 /** Get all supported chain names */
@@ -315,6 +329,7 @@ export async function fetchAgents(options: {
     const addrs = getContractAddresses(chain);
     const identity = new ethers.Contract(addrs.identity, IDENTITY_ABI, provider);
     const reputation = new ethers.Contract(addrs.reputation, REPUTATION_ABI, provider);
+    const validation = new ethers.Contract(addrs.validation, VALIDATION_ABI, provider);
 
     let maxId = cached && cached.totalAgents > 0 ? cached.totalAgents - 1 : -1;
     if (maxId === -1) {
@@ -356,12 +371,24 @@ export async function fetchAgents(options: {
                     }
                 } catch { /* no reputation data */ }
 
+                // Fetch validation summary
+                let validationCount = 0;
+                let validationAvg = 0;
+                try {
+                    // Empty array = all validators, empty string = all tags
+                    const [vCount, vAvg] = await validation.getSummary(agentId, [], "");
+                    validationCount = Number(vCount);
+                    validationAvg = Number(vAvg);
+                } catch { /* Validation Registry maybe not deployed or no proofs */ }
+
                 return {
                     agentId,
                     owner,
                     registration,
                     feedbackCount,
                     avgScore,
+                    validationCount,
+                    validationAvg,
                 };
             })
         );
@@ -400,6 +427,7 @@ export async function fetchAgentById(
     const addrs = getContractAddresses(chain);
     const identity = new ethers.Contract(addrs.identity, IDENTITY_ABI, provider);
     const reputation = new ethers.Contract(addrs.reputation, REPUTATION_ABI, provider);
+    const validation = new ethers.Contract(addrs.validation, VALIDATION_ABI, provider);
 
     try {
         const [owner, tokenURI] = await Promise.all([
@@ -422,7 +450,15 @@ export async function fetchAgentById(
             }
         } catch { /* no reputation data */ }
 
-        const data = { agentId, owner, registration, feedbackCount, avgScore };
+        let validationCount = 0;
+        let validationAvg = 0;
+        try {
+            const [vCount, vAvg] = await validation.getSummary(agentId, [], "");
+            validationCount = Number(vCount);
+            validationAvg = Number(vAvg);
+        } catch { /* Validation Registry maybe not deployed or no proofs */ }
+
+        const data = { agentId, owner, registration, feedbackCount, avgScore, validationCount, validationAvg };
 
         // Save to cache
         const newCache = loadCache();
