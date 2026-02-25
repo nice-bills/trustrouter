@@ -79,6 +79,8 @@ export function rankAgents(agents: AgentData[], options: MatchOptions): ScoredAg
         switch (sortField) {
             case "name":
                 return (a.agent.registration.name || "").localeCompare(b.agent.registration.name || "");
+            case "recent":
+                return b.agent.agentId - a.agent.agentId; // Higher ID = registered more recently
             case "reputation":
             default:
                 return b.trustScore - a.trustScore;
