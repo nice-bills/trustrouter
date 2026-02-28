@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import Table from "cli-table3";
-import { fetchAgents } from "../registry.js";
-import { rankAgents, type ScoredAgent } from "../router/index.js";
 import { setRefresh } from "../cache.js";
+
+const API_URL = "https://trustrouter-api-538154404155.us-central1.run.app";
 
 interface FindOptions {
     task: string;
@@ -18,14 +18,33 @@ export async function findCommand(options: FindOptions): Promise<void> {
     if (options.refresh) setRefresh(true);
 
     try {
-        if (!isJson) console.log(chalk.dim("\n  Querying ERC-8004 service registry via public RPC..."));
+        const url = new URL(`${API_URL}/agents`);
+        url.searchParams.set("chain", options.chain);
+        url.searchParams.set("limit", options.limit);
+        url.searchParams.set("task", options.task);
+        if (options.type) url.searchParams.set("type", options.type);
 
-        const agents = await fetchAgents({ chain: options.chain, first: 100 });
-        const results = rankAgents(agents, {
-            task: options.task,
-            type: options.type,
-            limit: parseInt(options.limit),
-        });
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        const { agents } = await res.json() as any;
+
+        const results = agents.map((a: any) => ({
+            agent: {
+                agentId: a.agentId,
+                owner: a.owner,
+                registration: {
+                    name: a.name,
+                    description: a.description,
+                    services: a.services || [],
+                    x402Support: (a.services || []).some((s: any) => s.name?.toLowerCase() === "x402"),
+                },
+                feedbackCount: a.feedbackCount || 0,
+                avgScore: a.avgScore || 0,
+                validationCount: a.validationCount || 0,
+                validationAvg: a.validationAvg || 0,
+            },
+            trustScore: a.trustScore || 0
+        }));
 
         if (results.length === 0) {
             if (isJson) {
@@ -59,7 +78,7 @@ export async function findCommand(options: FindOptions): Promise<void> {
     }
 }
 
-function toJson(s: ScoredAgent) {
+function toJson(s: any) {
     return {
         agentId: s.agent.agentId,
         name: s.agent.registration.name,
@@ -71,20 +90,20 @@ function toJson(s: ScoredAgent) {
         validationAvg: s.agent.validationAvg,
         services: s.agent.registration.services || [],
         x402Support: s.agent.registration.x402Support || false,
-        x402Endpoint: s.agent.registration.services?.find(svc => svc.name.toLowerCase() === "x402")?.endpoint || null,
+        x402Endpoint: s.agent.registration.services?.find((svc: any) => svc.name.toLowerCase() === "x402")?.endpoint || null,
         owner: s.agent.owner,
     };
 }
 
-function printTable(results: ScoredAgent[]): void {
+function printTable(results: any[]): void {
     const table = new Table({
         head: ["#", "ID", "Name", "Trust", "Reviews", "Services"].map((h) => chalk.bold(h)),
         colWidths: [5, 8, 30, 14, 9, 28],
         style: { head: [], border: ["dim"] },
     });
 
-    results.forEach((r, i) => {
-        const svcs = r.agent.registration.services?.map((s) => svcTag(s.name)).join(" ") || chalk.dim("-");
+    results.forEach((r: any, i: number) => {
+        const svcs = r.agent.registration.services?.map((s: any) => svcTag(s.name)).join(" ") || chalk.dim("-");
         table.push([
             chalk.dim(`${i + 1}`),
             chalk.white(`${r.agent.agentId}`),

@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import Table from "cli-table3";
-import { fetchAgents, getTotalAgents } from "../registry.js";
-import { rankAgents, type ScoredAgent } from "../router/index.js";
 import { setRefresh } from "../cache.js";
+
+const API_URL = "https://trustrouter-api-538154404155.us-central1.run.app";
 
 interface ListOptions {
     chain: string;
@@ -18,15 +18,33 @@ export async function listCommand(options: ListOptions): Promise<void> {
     if (options.refresh) setRefresh(true);
 
     try {
-        if (!isJson) console.log(chalk.dim("\n  Querying ERC-8004 service registry via public RPC..."));
+        const url = new URL(`${API_URL}/agents`);
+        url.searchParams.set("chain", options.chain);
+        url.searchParams.set("limit", options.limit);
+        if (options.type) url.searchParams.set("type", options.type);
 
-        const total = await getTotalAgents(options.chain);
-        const agents = await fetchAgents({ chain: options.chain, first: Math.min(parseInt(options.limit) * 2, 100) });
-        const results = rankAgents(agents, {
-            type: options.type,
-            sort: options.sort,
-            limit: parseInt(options.limit),
-        });
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        const { agents } = await res.json() as any;
+
+        // Map API response to the format expected by the CLI printer
+        const results = agents.map((a: any) => ({
+            agent: {
+                agentId: a.agentId,
+                owner: a.owner,
+                registration: {
+                    name: a.name,
+                    description: a.description,
+                    services: a.services || [],
+                    x402Support: (a.services || []).some((s: any) => s.name?.toLowerCase() === "x402"),
+                },
+                feedbackCount: a.feedbackCount || 0,
+                avgScore: a.avgScore || 0,
+                validationCount: a.validationCount || 0,
+                validationAvg: a.validationAvg || 0,
+            },
+            trustScore: a.trustScore || 0
+        }));
 
         if (results.length === 0) {
             if (isJson) {
@@ -39,7 +57,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
         if (isJson) {
             console.log(JSON.stringify(
-                results.map((r) => ({
+                results.map((r: any) => ({
                     agentId: r.agent.agentId,
                     name: r.agent.registration.name,
                     trustScore: r.trustScore,
@@ -49,7 +67,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
                     validationAvg: r.agent.validationAvg,
                     services: r.agent.registration.services || [],
                     x402Support: r.agent.registration.x402Support || false,
-                    x402Endpoint: r.agent.registration.services?.find(svc => svc.name.toLowerCase() === "x402")?.endpoint || null,
+                    x402Endpoint: r.agent.registration.services?.find((svc: any) => svc.name.toLowerCase() === "x402")?.endpoint || null,
                 })),
                 null, 2
             ));
@@ -58,7 +76,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
         console.log(
             "\n" + chalk.bold.cyan("  📋 ERC-8004 Registered Services") +
-            chalk.dim(` (${total} total, showing ${results.length})`)
+            chalk.dim(` (showing top ${results.length} globally)`)
         );
         console.log("");
 
@@ -68,8 +86,8 @@ export async function listCommand(options: ListOptions): Promise<void> {
             style: { head: [], border: ["dim"] },
         });
 
-        results.forEach((r, i) => {
-            const svcs = r.agent.registration.services?.map((s) => svcTag(s.name)).join(" ") || chalk.dim("-");
+        results.forEach((r: any, i: number) => {
+            const svcs = r.agent.registration.services?.map((s: any) => svcTag(s.name)).join(" ") || chalk.dim("-");
             table.push([
                 chalk.dim(`${i + 1}`),
                 chalk.white(`${r.agent.agentId}`),
@@ -82,7 +100,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
         });
 
         console.log(table.toString());
-        console.log(chalk.dim(`\n  Sorted by: ${options.sort}\n`));
+        console.log(chalk.dim(`\n  Sorted by: trustScore (global)\n`));
     } catch (err: any) {
         if (isJson) {
             console.log(JSON.stringify({ error: err.message }));
