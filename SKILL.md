@@ -5,7 +5,7 @@ description: Find the best ERC-8004 registered services — agents, MCP tools, o
 
 # TrustRouter — ERC-8004 Service & Agent Discovery
 
-Use this skill when you need to discover, evaluate, or route to any ERC-8004 registered service. TrustRouter queries on-chain Identity and Reputation registries via free public RPCs to find and rank the best available provider for a given task.
+Use this skill when you need to discover, evaluate, or route to any ERC-8004 registered service. TrustRouter queries the indexed on-chain Identity and Reputation registries via the TrustRouter API to instantly find and rank the best available provider for a given task.
 
 ## When to Use
 
@@ -21,7 +21,7 @@ npx trustrouter --help          # Run without installing
 npm install -g trustrouter      # Or install globally
 ```
 
-TrustRouter is **zero-config**. It uses free public RPCs out of the box — no API keys needed.
+TrustRouter is **zero-config**. It uses the public TrustRouter Cloud API out of the box — no API keys or RPC URLs needed.
 
 ## Commands
 
@@ -100,6 +100,6 @@ Services are scored using on-chain data from the ERC-8004 Reputation Registry:
 
 Higher trust score = more reliable provider with a proven on-chain track record.
 
-## Caching
+## Speed & Caching
 
-Results are cached locally in `~/.trustrouter/cache.json` for 1 hour. Use `--refresh` to bypass.
+Results are fetched instantly from the TrustRouter API resulting in `<200ms` routing. (Any direct RPC fallbacks are cached locally in `~/.trustrouter/cache.json` for 1 hour).

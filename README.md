@@ -4,7 +4,7 @@
 
 **ERC-8004 Reputation-Aware Service Router**
 
-Discover, rank, and route to the best services on-chain — agents, MCP tools, oracles, APIs, DeFi bots, and anything registered on [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004). TrustRouter queries the Identity and Reputation registries using free public RPCs to find the highest-trust provider for any given task.
+Discover, rank, and route to the best services on-chain — agents, MCP tools, oracles, APIs, DeFi bots, and anything registered on [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004). TrustRouter queries the public TrustRouter Cloud API (backed by the Identity and Reputation registries) to instantly find the highest-trust provider for any given task.
 
 > *"Reputation-aware routing: Middleware that ingests ERC-8004 reputation data and dynamically routes requests to the best-performing service for a given task at a given moment."*
 > — [Vitto Rivabella](https://x.com/VittoStack), ERC-8004 co-creator
@@ -29,7 +29,7 @@ npx trustrouter@latest list
 npm install -g trustrouter
 ```
 
-TrustRouter works out of the box using free public RPCs — zero API keys required.
+TrustRouter works out of the box using the public TrustRouter Cloud API — zero API keys or RPC URLs required.
 
 ```bash
 # Find the best service for a task
@@ -51,8 +51,8 @@ trustrouter inspect "PriceFeedOracle" --chain base
 | `trustrouter list [--chain ethereum] [--sort reputation] [--limit 20]` | List all registered services |
 | `trustrouter inspect <id-or-name> [--chain ethereum]` | Full details of a service (by ID or name) |
 
-**Local Caching:**
-All RPC responses are automatically cached locally in `~/.trustrouter/cache.json` for 1 hour. This significantly speeds up subsequent commands (e.g. from 50s down to 0.7s) and prevents rate-limiting when using free public RPCs.
+**Speed & Caching:**
+The CLI fetches data directly from the decentralized TrustRouter API (`https://trustrouter-api...`), completely bypassing slow RPC queries to deliver instant `<200ms` service routing. (Any direct RPC fallbacks are automatically cached locally in `~/.trustrouter/cache.json` for 1 hour).
 
 All commands support the global `-o json` flag for machine-readable output:
 
@@ -110,23 +110,21 @@ TrustRouter ships with a [SKILL.md](./SKILL.md) for OpenClaw agents. After insta
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────────┐
-│  CLI / Agent │ ──▸ │  Router (Scorer   │
-│   Commands   │     │  + Matcher)       │
-└──────┬──────┘     └────────┬─────────┘
-       │                     │
-       ▼                     ▼
-┌──────────────────────────────────────┐
-│  Registry Layer (Free Public RPCs)   │
-│  Parallel Batched Contract Queries   │
-└──────────────────┬───────────────────┘
-                   │
-          ┌────────▾─────────┐
-          │  ERC-8004        │
-          │  Identity +      │
-          │  Reputation      │
-          │  Registries      │
-          └──────────────────┘
+┌─────────────┐       ┌────────────────────┐
+│  CLI / Agent │ ──fetch▸│  TrustRouter API   │
+│   Commands   │       │  (Cloud Run)       │
+└──────┬──────┘       └────────┬───────────┘
+       │                       │
+       ▼                       ▼
+┌──────────────────────────────────────────┐
+│          Google Cloud Firestore          │
+│       (Indexed for instant sorting)      │
+└──────────────────────┬───────────────────┘
+                       │
+              ┌────────▾─────────┐
+              │  indexer.ts      │
+              │  (Background Job)│
+              └──────────────────┘
 ```
 
 ## Advanced Usage (Custom RPCs)
